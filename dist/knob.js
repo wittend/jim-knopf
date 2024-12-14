@@ -15,7 +15,6 @@ Knob = function(input, ui) {
   this.min = settings.min;
 
   this.ui = ui;
-  input.addEventListener('change', this.changed.bind(this), false);
 
   var events = {
     keydown: this._handleKeyEvents.bind(this),
@@ -56,8 +55,9 @@ Knob.prototype = {
   },
 
   _handleMove: function(onMove, onEnd) {
-    this.centerX = this.container.offsetLeft + this.settings.width / 2;
-    this.centerY = this.container.offsetTop + this.settings.height / 2;
+    this.centerX = Math.floor(this.container.getBoundingClientRect().left)+ document.body.scrollLeft + this.settings.width / 2;
+    this.centerY = Math.floor(this.container.getBoundingClientRect().top)+ document.body.scrollTop + this.settings.height / 2;
+
     var fnc = this._updateWhileMoving.bind(this);
     var body = document.body;
     body.addEventListener(onMove, fnc, false);
@@ -89,12 +89,30 @@ Knob.prototype = {
     var step = (this.settings.max - this.min) / range;
     this.value = this.input.value = Math.round(value / step) * step;
     this.ui.update(percent, this.value);
+    this.triggerChange();
   },
 
   changed: function(direction) {
     this.input.value = this.limit(parseFloat(this.input.value) + direction * (this.input.step || 1));
     this.value = this.input.value;
     this.ui.update(this._valueToPercent(), this.value);
+    this.triggerChange();
+  },
+
+  update: function(value) {
+    this.input.value = this.limit(value);
+    this.value = this.input.value;
+    this.ui.update(this._valueToPercent(), this.value);
+    this.triggerChange();
+  },
+
+  triggerChange: function  () {
+    if (document.createEventObject) {
+      var evt = document.createEventObject();
+      this.input.fireEvent("onchange", evt);
+    } else {
+      this.input.dispatchEvent(new Event('change'));
+    }
   },
 
   _valueToPercent: function() {
@@ -104,8 +122,10 @@ Knob.prototype = {
   limit: function(value) {
     return Math.min(Math.max(this.settings.min, value), this.settings.max);
   },
-  _getSettings: function(input) {    
-    var labels; 
+
+  _getSettings: function(input) {
+    var labels;
+
     if(input.dataset.labels){
       labels = input.dataset.labels.split(',');
     }
@@ -261,8 +281,8 @@ Ui.Scale.prototype.createElement = function(parentEl) {
         rect.rotate(this.startAngle + i * step, this.width / 2, this.height / 2);
         this.el.append(rect);
         this.ticks.push(rect);
-      }  
-    } 
+      }
+    }
   }
   this.appendTo(parentEl);
   if (this.options.drawDial) {
@@ -295,8 +315,8 @@ Ui.Scale.prototype.dial = function() {
       text.attr('text-anchor', 'middle');
       this.dials.push(text);
     }
+
   }
-  
 };
 
 Ui.Scale.prototype.update = function(percent) {
@@ -431,9 +451,10 @@ Ui.El.Text.prototype.center = function(element) {
 
 Ui.El.Arc = function(options) {
   this.options = options;
-  //when there are lables, do not shift the arc other wise it will be 180 degree off 
+  //when there are lables, do not shift the arc other wise it will be 180 degree off
   //compared to the labels
   this.options.angleoffset = (options.angleoffset || 0) - (this.options.labels?0:90);
+
   this.create('path');
 };
 
@@ -448,11 +469,6 @@ Ui.El.Arc.prototype.getCoords = function(angle) {
   var startAngle = this.options.angleoffset;
   var outerRadius = this.options.outerRadius || this.options.width / 2;
   var innerRadius = this.options.innerRadius || this.options.width / 2 - this.options.arcWidth;
-  //position the arc so that it's shifted half an angle backward so that it's middle aligned
-  //when there're lables
-  if(this.options.labels){
-    startAngle -= angle/2;
-  }
   var startAngleDegree = Math.PI * startAngle / 180;
   var endAngleDegree = Math.PI * (startAngle + angle) / 180;
   var center = this.options.width / 2;
